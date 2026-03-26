@@ -1,0 +1,1486 @@
+# API Tasarımı - OpenAPI Specification
+
+**OpenAPI Spesifikasyon Dosyası:** [lawassist.yaml](lawassist.yaml)
+
+Bu doküman, OpenAPI Specification (OAS) 3.0 standardına göre hazırlanmış LawAssist projesinin REST API tasarımını içermektedir.
+
+## OpenAPI Specification
+
+```yaml
+openapi: 3.0.3
+
+info:
+  title: LawAssist API
+  version: 1.0.0
+  description: >
+    LawAssist, avukatların tevkil ilanı oluşturup başvuru almasını ve yönetmesini
+    sağlayan bir hukuk teknolojileri platformudur. Bu API; kullanıcı kimlik doğrulama,
+    avukat profil yönetimi, tevkil ilanı ve başvuru işlemleri ile admin yönetim
+    işlemlerini kapsar. JWT tabanlı kimlik doğrulama ile korunmaktadır.
+  contact:
+    name: Team Leviathan
+    email: support@lawassist.com
+
+servers:
+  - url: https://api.lawassist.com
+    description: Üretim sunucusu (Production)
+  - url: https://staging-api.lawassist.com
+    description: Test sunucusu (Staging)
+  - url: http://localhost:3000
+    description: Yerel geliştirme sunucusu (Development)
+
+tags:
+  - name: Auth
+    description: Kullanıcı kimlik doğrulama işlemleri (kayıt, giriş, şifre sıfırlama)
+  - name: Lawyers
+    description: Avukat profil görüntüleme, güncelleme ve silme işlemleri
+  - name: Listings
+    description: Tevkil ilanı oluşturma, filtreleme, güncelleme ve silme işlemleri
+  - name: Applications
+    description: İlanlara başvuru yapma, listeleme, onaylama ve reddetme işlemleri
+  - name: Admin
+    description: Yönetici paneli işlemleri (yalnızca admin yetkisiyle erişilebilir)
+
+security:
+  - BearerAuth: []
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Auth
+      summary: Kullanıcı Kayıt Ol
+      operationId: registerUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInput'
+      responses:
+        "201":
+          description: Kullanıcı başarıyla oluşturuldu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "400":
+          description: Geçersiz istek verisi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "409":
+          description: Bu e-posta adresi zaten kayıtlı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Kullanıcı Giriş Yap
+      operationId: loginUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        "200":
+          description: Giriş başarılı, JWT token döndürüldü
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "400":
+          description: Geçersiz istek verisi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: E-posta veya şifre hatalı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/forgot-password:
+    post:
+      tags:
+        - Auth
+      summary: Şifremi Unuttum – Şifre Sıfırlama Maili Gönder
+      operationId: forgotPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordInput'
+      responses:
+        "200":
+          description: Şifre sıfırlama bağlantısı e-posta adresine gönderildi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        "400":
+          description: Geçersiz e-posta formatı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Bu e-posta adresiyle kayıtlı kullanıcı bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/reset-password:
+    post:
+      tags:
+        - Auth
+      summary: Yeni Şifre Belirleme
+      operationId: resetPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordInput'
+      responses:
+        "200":
+          description: Şifre başarıyla güncellendi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        "400":
+          description: Geçersiz veya süresi dolmuş token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /lawyers/{lawyerId}:
+    parameters:
+      - name: lawyerId
+        in: path
+        required: true
+        description: Avukatın benzersiz kimlik numarası
+        schema:
+          type: string
+        example: "lawyer_abc123"
+
+    get:
+      tags:
+        - Lawyers
+      summary: Avukat Profil Bilgilerini Görüntüle
+      operationId: getLawyer
+      responses:
+        "200":
+          description: Avukat profili başarıyla getirildi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lawyer'
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Avukat bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      tags:
+        - Lawyers
+      summary: Avukat Profil Bilgilerini Güncelle
+      operationId: updateLawyer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LawyerUpdateInput'
+      responses:
+        "200":
+          description: Avukat profili başarıyla güncellendi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lawyer'
+        "400":
+          description: Geçersiz istek verisi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Yalnızca kendi profilinizi güncelleyebilirsiniz
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Avukat bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags:
+        - Lawyers
+      summary: Avukat Hesabını Sil
+      operationId: deleteLawyer
+      responses:
+        "204":
+          description: Avukat hesabı başarıyla silindi
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Yalnızca kendi hesabınızı silebilirsiniz
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Avukat bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /lawyers/{lawyerId}/listings:
+    parameters:
+      - name: lawyerId
+        in: path
+        required: true
+        description: Avukatın benzersiz kimlik numarası
+        schema:
+          type: string
+        example: "lawyer_abc123"
+
+    get:
+      tags:
+        - Lawyers
+      summary: Avukatın Kendi Açtığı İlanları Listele
+      operationId: getLawyerListings
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: İlan durumuna göre filtrele (active, passive, all)
+          schema:
+            type: string
+            enum: [active, passive, all]
+            default: all
+          example: active
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        "200":
+          description: İlanlar başarıyla listelendi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Listing'
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Yalnızca kendi ilanlarınızı görüntüleyebilirsiniz
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Avukat bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /listings:
+    post:
+      tags:
+        - Listings
+      summary: Tevkil İlanı Oluştur
+      operationId: createListing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListingInput'
+      responses:
+        "201":
+          description: İlan başarıyla oluşturuldu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Listing'
+        "400":
+          description: Geçersiz istek verisi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /listings/filter/city:
+    get:
+      tags:
+        - Listings
+      summary: İlanları Şehre Göre Filtrele
+      operationId: filterListingsByCity
+      security: []
+      parameters:
+        - name: city
+          in: query
+          required: true
+          description: Filtrelenecek şehir adı
+          schema:
+            type: string
+          example: "Ankara"
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        "200":
+          description: Şehre göre filtrelenmiş ilanlar başarıyla listelendi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Listing'
+        "400":
+          description: Geçersiz şehir parametresi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /listings/filter/date:
+    get:
+      tags:
+        - Listings
+      summary: İlanları Tarihe Göre Filtrele
+      operationId: filterListingsByDate
+      security: []
+      parameters:
+        - name: date
+          in: query
+          required: true
+          description: Filtrelenecek tarih (YYYY-MM-DD formatında)
+          schema:
+            type: string
+            format: date
+          example: "2026-03-15"
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        "200":
+          description: Tarihe göre filtrelenmiş ilanlar başarıyla listelendi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Listing'
+        "400":
+          description: Geçersiz tarih formatı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /listings/filter/courthouse:
+    get:
+      tags:
+        - Listings
+      summary: İlanları Adliyeye Göre Filtrele
+      operationId: filterListingsByCourthouse
+      security: []
+      parameters:
+        - name: courthouse
+          in: query
+          required: true
+          description: Filtrelenecek adliye adı
+          schema:
+            type: string
+          example: "Ankara Adliyesi"
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        "200":
+          description: Adliyeye göre filtrelenmiş ilanlar başarıyla listelendi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Listing'
+        "400":
+          description: Geçersiz adliye parametresi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /listings/{listingId}:
+    parameters:
+      - name: listingId
+        in: path
+        required: true
+        description: İlanın benzersiz kimlik numarası
+        schema:
+          type: string
+        example: "listing_xyz789"
+
+    put:
+      tags:
+        - Listings
+      summary: Tevkil İlanını Güncelle
+      operationId: updateListing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListingInput'
+      responses:
+        "200":
+          description: İlan başarıyla güncellendi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Listing'
+        "400":
+          description: Geçersiz istek verisi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Yalnızca kendi ilanınızı güncelleyebilirsiniz
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: İlan bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags:
+        - Listings
+      summary: Tevkil İlanını Yayından Kaldır / Sil
+      operationId: deleteListing
+      responses:
+        "204":
+          description: İlan başarıyla silindi
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Yalnızca kendi ilanınızı silebilirsiniz
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: İlan bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /listings/{listingId}/applications:
+    parameters:
+      - name: listingId
+        in: path
+        required: true
+        description: İlanın benzersiz kimlik numarası
+        schema:
+          type: string
+        example: "listing_xyz789"
+
+    get:
+      tags:
+        - Applications
+      summary: Kişinin Kendi İlanına Yapılan Başvuruları Listele
+      operationId: listApplications
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        "200":
+          description: Başvurular başarıyla listelendi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Application'
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Yalnızca ilan sahibi başvuruları görebilir
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: İlan bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags:
+        - Applications
+      summary: Tevkil İlanına Başvur
+      operationId: applyToListing
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplicationInput'
+      responses:
+        "201":
+          description: Başvuru başarıyla oluşturuldu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+        "400":
+          description: Geçersiz istek verisi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Kendi ilanınıza başvuramazsınız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: İlan bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "409":
+          description: Bu ilana zaten başvurdunuz
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /listings/{listingId}/applications/{applicationId}:
+    parameters:
+      - name: listingId
+        in: path
+        required: true
+        description: İlanın benzersiz kimlik numarası
+        schema:
+          type: string
+        example: "listing_xyz789"
+      - name: applicationId
+        in: path
+        required: true
+        description: Başvurunun benzersiz kimlik numarası
+        schema:
+          type: string
+        example: "app_def456"
+
+    delete:
+      tags:
+        - Applications
+      summary: Yapılan Başvuruyu İptal Et
+      operationId: cancelApplication
+      responses:
+        "204":
+          description: Başvuru başarıyla iptal edildi
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Yalnızca kendi başvurunuzu iptal edebilirsiniz
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Başvuru bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /applications/{applicationId}/approve:
+    parameters:
+      - name: applicationId
+        in: path
+        required: true
+        description: Başvurunun benzersiz kimlik numarası
+        schema:
+          type: string
+        example: "app_def456"
+
+    put:
+      tags:
+        - Applications
+      summary: Tevkil Başvurusunu Onayla
+      operationId: approveApplication
+      responses:
+        "200":
+          description: Başvuru başarıyla onaylandı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Bu işlem için yalnızca ilan sahibi yetkilidir
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Başvuru bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /applications/{applicationId}/reject:
+    parameters:
+      - name: applicationId
+        in: path
+        required: true
+        description: Başvurunun benzersiz kimlik numarası
+        schema:
+          type: string
+        example: "app_def456"
+
+    put:
+      tags:
+        - Applications
+      summary: Tevkil Başvurusunu Reddet
+      operationId: rejectApplication
+      responses:
+        "200":
+          description: Başvuru başarıyla reddedildi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Bu işlem için yalnızca ilan sahibi yetkilidir
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Başvuru bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/auth/login:
+    post:
+      tags:
+        - Admin
+      summary: Admin Giriş Yap
+      operationId: adminLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        "200":
+          description: Admin girişi başarılı, JWT token döndürüldü
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "400":
+          description: Geçersiz istek verisi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Kullanıcı adı veya şifre hatalı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Admin yetkisi bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/lawyers:
+    get:
+      tags:
+        - Admin
+      summary: Tüm Avukatları Listele
+      operationId: adminListLawyers
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Hesap durumuna göre filtrele
+          schema:
+            type: string
+            enum: [active, passive, suspended, all]
+            default: all
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Avukat listesi başarıyla getirildi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Lawyer'
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Bu işlem yalnızca admin yetkisiyle erişilebilir
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/lawyers/{lawyerId}:
+    parameters:
+      - name: lawyerId
+        in: path
+        required: true
+        description: Avukatın benzersiz kimlik numarası
+        schema:
+          type: string
+        example: "lawyer_abc123"
+
+    get:
+      tags:
+        - Admin
+      summary: Avukat Hesabını Görüntüle
+      operationId: adminGetLawyer
+      responses:
+        "200":
+          description: Avukat detayları başarıyla getirildi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LawyerDetail'
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Bu işlem yalnızca admin yetkisiyle erişilebilir
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Avukat bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      tags:
+        - Admin
+      summary: Avukat Hesabını Güncelle
+      operationId: adminUpdateLawyer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LawyerUpdateInput'
+      responses:
+        "200":
+          description: Avukat bilgileri başarıyla güncellendi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lawyer'
+        "400":
+          description: Geçersiz istek verisi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Bu işlem yalnızca admin yetkisiyle erişilebilir
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Avukat bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags:
+        - Admin
+      summary: Avukat Hesabını Sil
+      operationId: adminDeleteLawyer
+      responses:
+        "204":
+          description: Avukat hesabı kalıcı olarak silindi
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Bu işlem yalnızca admin yetkisiyle erişilebilir
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Avukat bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/lawyers/{lawyerId}/suspend:
+    parameters:
+      - name: lawyerId
+        in: path
+        required: true
+        description: Avukatın benzersiz kimlik numarası
+        schema:
+          type: string
+        example: "lawyer_abc123"
+
+    put:
+      tags:
+        - Admin
+      summary: Avukat Hesabını Belli Bir Süreliğine Pasif Hale Getir
+      operationId: adminSuspendLawyer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuspendInput'
+      responses:
+        "200":
+          description: Avukat hesabı başarıyla askıya alındı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lawyer'
+        "400":
+          description: Geçersiz askı süresi veya veri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Bu işlem yalnızca admin yetkisiyle erişilebilir
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: Avukat bulunamadı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/listings:
+    get:
+      tags:
+        - Admin
+      summary: Konumdan Bağımsız Tüm İlanları Listele
+      operationId: adminListAllListings
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: İlan durumuna göre filtrele
+          schema:
+            type: string
+            enum: [active, passive, pending, all]
+            default: all
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Tüm ilanlar başarıyla listelendi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Listing'
+        "401":
+          description: Kimlik doğrulama başarısız
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Bu işlem yalnızca admin yetkisiyle erişilebilir
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'JWT tabanlı kimlik doğrulama'
+
+  schemas:
+
+    RegisterInput:
+      type: object
+      description: Yeni kullanıcı kayıt bilgileri
+      properties:
+        firstName:
+          type: string
+          minLength: 2
+          maxLength: 50
+          example: "Ahmet"
+        lastName:
+          type: string
+          minLength: 2
+          maxLength: 50
+          example: "Yılmaz"
+        email:
+          type: string
+          format: email
+          example: "ahmet@example.com"
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: "Sifre1234!"
+        barAssociation:
+          type: string
+          description: Baro adı
+          example: "Ankara Barosu"
+        barNumber:
+          type: string
+          description: Baro sicil numarası
+          example: "12345"
+        phone:
+          type: string
+          example: "+905551234567"
+      required:
+        - firstName
+        - lastName
+        - email
+        - password
+
+    LoginInput:
+      type: object
+      description: Giriş yapma bilgileri
+      properties:
+        email:
+          type: string
+          format: email
+          example: "ahmet@example.com"
+        password:
+          type: string
+          format: password
+          example: "Sifre1234!"
+      required:
+        - email
+        - password
+
+    ForgotPasswordInput:
+      type: object
+      description: Şifre sıfırlama maili için e-posta
+      properties:
+        email:
+          type: string
+          format: email
+          example: "ahmet@example.com"
+      required:
+        - email
+
+    ResetPasswordInput:
+      type: object
+      description: Yeni şifre belirleme verisi
+      properties:
+        token:
+          type: string
+          description: E-posta ile gelen sıfırlama token'ı
+          example: "reset_token_xyz"
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+          example: "YeniSifre1234!"
+      required:
+        - token
+        - newPassword
+
+    AuthResponse:
+      type: object
+      description: Başarılı kimlik doğrulama yanıtı
+      properties:
+        token:
+          type: string
+          description: JWT erişim token'ı
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        lawyer:
+          $ref: '#/components/schemas/Lawyer'
+
+    Lawyer:
+      type: object
+      description: Avukat profil bilgileri
+      properties:
+        _id:
+          type: string
+          example: "lawyer_abc123"
+        firstName:
+          type: string
+          example: "Ahmet"
+        lastName:
+          type: string
+          example: "Yılmaz"
+        email:
+          type: string
+          format: email
+          example: "ahmet@example.com"
+        phone:
+          type: string
+          example: "+905551234567"
+        barAssociation:
+          type: string
+          example: "Ankara Barosu"
+        barNumber:
+          type: string
+          example: "12345"
+        specializations:
+          type: array
+          description: Uzmanlık alanları
+          items:
+            type: string
+          example: ["Ceza Hukuku", "Aile Hukuku"]
+        status:
+          type: string
+          enum: [active, passive, suspended]
+          example: "active"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-01-10T09:00:00Z"
+      required:
+        - firstName
+        - lastName
+        - email
+
+    LawyerDetail:
+      allOf:
+        - $ref: '#/components/schemas/Lawyer'
+        - type: object
+          description: Admin paneli için genişletilmiş avukat bilgileri
+          properties:
+            listings:
+              type: array
+              description: Avukatın açtığı ilanlar
+              items:
+                $ref: '#/components/schemas/Listing'
+            applications:
+              type: array
+              description: Avukatın yaptığı başvurular
+              items:
+                $ref: '#/components/schemas/Application'
+            suspendedUntil:
+              type: string
+              format: date-time
+              description: Askı bitiş tarihi
+              example: "2026-04-01T00:00:00Z"
+
+    LawyerUpdateInput:
+      type: object
+      description: Avukat profil güncelleme verisi
+      properties:
+        firstName:
+          type: string
+          minLength: 2
+          maxLength: 50
+          example: "Ahmet"
+        lastName:
+          type: string
+          minLength: 2
+          maxLength: 50
+          example: "Yılmaz"
+        email:
+          type: string
+          format: email
+          example: "ahmet@example.com"
+        phone:
+          type: string
+          example: "+905551234567"
+        specializations:
+          type: array
+          items:
+            type: string
+          example: ["Ceza Hukuku"]
+
+    Listing:
+      type: object
+      description: Tevkil ilanı bilgileri
+      properties:
+        _id:
+          type: string
+          example: "listing_xyz789"
+        title:
+          type: string
+          example: "Ankara 2. Asliye Ceza - Duruşma Tevkili"
+        description:
+          type: string
+          example: "10 Mart 2026 tarihli duruşma için tevkil avukatı aranıyor."
+        city:
+          type: string
+          example: "Ankara"
+        courthouse:
+          type: string
+          example: "Ankara Adliyesi"
+        date:
+          type: string
+          format: date
+          example: "2026-03-10"
+        status:
+          type: string
+          enum: [active, passive]
+          example: "active"
+        ownerId:
+          type: string
+          example: "lawyer_abc123"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-02-20T10:00:00Z"
+      required:
+        - title
+        - city
+        - courthouse
+        - date
+
+    ListingInput:
+      type: object
+      description: Tevkil ilanı oluşturma / güncelleme verisi
+      properties:
+        title:
+          type: string
+          minLength: 5
+          maxLength: 150
+          example: "Ankara 2. Asliye Ceza - Duruşma Tevkili"
+        description:
+          type: string
+          maxLength: 1000
+          example: "10 Mart 2026 tarihli duruşma için tevkil avukatı aranıyor."
+        city:
+          type: string
+          minLength: 2
+          maxLength: 50
+          example: "Ankara"
+        courthouse:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: "Ankara Adliyesi"
+        date:
+          type: string
+          format: date
+          example: "2026-03-10"
+      required:
+        - title
+        - city
+        - courthouse
+        - date
+
+    Application:
+      type: object
+      description: Tevkil başvurusu bilgileri
+      properties:
+        _id:
+          type: string
+          example: "app_def456"
+        listingId:
+          type: string
+          example: "listing_xyz789"
+        applicantId:
+          type: string
+          example: "lawyer_abc123"
+        note:
+          type: string
+          maxLength: 500
+          example: "Belirtilen tarihte müsaitim, deneyimim var."
+        status:
+          type: string
+          enum: [pending, approved, rejected, cancelled]
+          example: "pending"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-02-21T14:30:00Z"
+      required:
+        - listingId
+        - applicantId
+
+    ApplicationInput:
+      type: object
+      description: Başvuru oluşturma verisi
+      properties:
+        note:
+          type: string
+          description: Opsiyonel başvuru notu
+          maxLength: 500
+          example: "Belirtilen tarihte müsaitim."
+
+    SuspendInput:
+      type: object
+      description: Hesap askıya alma verisi
+      properties:
+        reason:
+          type: string
+          minLength: 5
+          maxLength: 500
+          example: "Kullanım koşullarının ihlali"
+        suspendUntil:
+          type: string
+          format: date-time
+          description: Askı bitiş tarihi (belirtilmezse süresiz)
+          example: "2026-04-01T00:00:00Z"
+      required:
+        - reason
+
+    MessageResponse:
+      type: object
+      description: Genel mesaj yanıtı
+      properties:
+        message:
+          type: string
+          example: "İşlem başarıyla tamamlandı."
+      required:
+        - message
+
+    Error:
+      type: object
+      description: Hata durumlarında döndürülen standart yanıt
+      properties:
+        message:
+          type: string
+          example: "Kaynak bulunamadı."
+      required:
+        - message
+```
