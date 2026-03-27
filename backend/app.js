@@ -17,6 +17,9 @@ app.use(cors());
 app.use(express.json());
 
 // --- Routes ---
+app.get('/', (req, res) => {
+  res.json({ success: true, message: 'LawAssist API çalışıyor 🚀' });
+});
 app.use('/api/auth',         authRoutes);
 app.use('/api/lawyers',      lawyersRoutes);
 app.use('/api/listings', listingsRoutes); // henüz yazılmadı
